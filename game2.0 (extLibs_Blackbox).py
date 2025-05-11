@@ -18,12 +18,14 @@ class FinancialTheftSimulator:
         # Initialize player count variable
         self.player_count = tk.IntVar(value=3)  # Default value is 3
 
+        # Set the number of rounds for the game
+        self.max_rounds = 5  # <-- Add this line
+
         # Initialize game components
         self.create_game_components()
         self.setup_ui()
 
         # Center the window after UI setup
-        self.root.update_idletasks()  # Ensure all geometry calculations are up-to-date
         self.center_window(self.root, 1200, 750)
 
     def toggle_fullscreen(self, event=None):
@@ -132,6 +134,7 @@ class FinancialTheftSimulator:
             "Loud": [200000, 210000, 220000, 230000, 240000],
             "Stealth": [80000, 90000, 100000, 110000, 120000]
         }
+
     def setup_ui(self):
         self.main_frame = ttk.Frame(self.root, padding=10)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -140,19 +143,26 @@ class FinancialTheftSimulator:
         self.main_frame.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(0, weight=1)
 
-        self.setup_frame = ttk.LabelFrame(self.main_frame, text="🕵️ Crew Assembly", padding=10)
-        self.setup_frame.grid(row=0, column=0, sticky="nsew")  # Center the setup_frame
+        # Remove padx=200, pady=100 for true centering
+        self.setup_frame = ttk.LabelFrame(self.main_frame, text="🕵️ Crew Assembly", padding=20)
+        self.setup_frame.grid(row=0, column=0, sticky="")  # No sticky, no padding
 
-        ttk.Label(self.setup_frame, text="Number of Operatives (3-4):", font=('Arial', 10)).grid(row=0, column=0, pady=5)
-        ttk.Spinbox(self.setup_frame, from_=3, to_=4, textvariable=self.player_count, width=5).grid(row=0, column=1, pady=5)
+        # Center the widgets inside setup_frame (optional, for better look)
+        for i in range(2):
+            self.setup_frame.grid_columnconfigure(i, weight=1)
+
+        ttk.Label(self.setup_frame, text="Number of Operatives (3-4):", font=('Arial', 10)).grid(
+            row=0, column=0, pady=5, sticky="e")
+        ttk.Spinbox(self.setup_frame, from_=3, to_=4, textvariable=self.player_count, width=5).grid(
+            row=0, column=1, pady=5, sticky="w")
 
         self.player_name_entries = []
         self.player_name_labels = []
         for i in range(4):
             label = ttk.Label(self.setup_frame, text=f"Operative {i+1} Alias:")
-            label.grid(row=i+1, column=0, pady=2)
+            label.grid(row=i+1, column=0, pady=2, sticky="e")
             entry = ttk.Entry(self.setup_frame)
-            entry.grid(row=i+1, column=1, pady=2)
+            entry.grid(row=i+1, column=1, pady=2, sticky="w")
             self.player_name_entries.append(entry)
             self.player_name_labels.append(label)
             if i >= 3:  # Only hide the 4th player entry by default
@@ -161,7 +171,8 @@ class FinancialTheftSimulator:
 
         self.player_count.trace_add("write", self.update_player_ui)
 
-        ttk.Button(self.setup_frame, text="🚀 Initiate Heist", command=self.start_game, style='Accent.TButton').grid(row=5, column=0, columnspan=2, pady=10)
+        ttk.Button(self.setup_frame, text="🚀 Initiate Heist", command=self.start_game, style='Accent.TButton').grid(
+            row=5, column=0, columnspan=2, pady=10, sticky="ew")
 
         self.game_area = ttk.Frame(self.main_frame)
         self.game_area.grid_columnconfigure(0, weight=1)
@@ -185,9 +196,9 @@ class FinancialTheftSimulator:
         style.configure('TLabel', background='#ecf0f1', foreground='#2c3e50')
         style.configure('TButton', background='#2980b9', foreground='white')
         style.map('TButton',
-              foreground=[('pressed', 'white'), ('active', 'white')],
+              foreground=[('pressed', 'white'), ('active', 'white')], 
               background=[('pressed', '#1c5980'), ('active', '#3498db')])
-    
+
     def update_player_ui(self, *args):
         count = self.player_count.get()
         for i in range(4):
@@ -201,12 +212,14 @@ class FinancialTheftSimulator:
     def show_narrative_popup(self, title, narrative, tagline):
         popup = tk.Toplevel(self.root)
         popup.title(title)
-        popup.geometry("600x400")
         popup.configure(bg='#ecf0f1')
         popup.grab_set()
-        popup.update_idletasks()
-        x = (popup.winfo_screenwidth() // 2) - (600 // 2)
-        y = (popup.winfo_screenheight() // 2) - (400 // 2)
+
+        # Calculate and center the window
+        screen_width = popup.winfo_screenwidth()
+        screen_height = popup.winfo_screenheight()
+        x = (screen_width // 2) - (600 // 2)
+        y = (screen_height // 2) - (400 // 2)
         popup.geometry(f"600x400+{x}+{y}")
 
         main_frame = ttk.Frame(popup, padding=15)
@@ -215,6 +228,7 @@ class FinancialTheftSimulator:
         ttk.Label(main_frame, text=tagline, font=('Arial', 12, 'bold'), wraplength=550, foreground='#34495e').pack(pady=5)
         ttk.Separator(main_frame, orient='horizontal').pack(fill=tk.X, pady=5)
 
+        # ScrolledText widget to display narrative
         text_area = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD, width=70, height=12, font=('Arial', 10))
         text_area.insert(tk.INSERT, narrative)
         text_area.configure(state='disabled', background='#f8f9fa', foreground='#2c3e50')
@@ -492,6 +506,14 @@ class FinancialTheftSimulator:
             player['capital'] += reward
             total_investment = player.get('total_investment', 0)
             player['roi'] = ((reward - total_investment) / total_investment) * 100 if total_investment else 0
+            # Ensure NPV is up to date
+            discount_rate = 0.10
+            player['npv'] = -total_investment + (reward / (1 + discount_rate))
+
+        # Determine winners
+        strategic_winner = max(self.players, key=lambda p: p.get('npv', 0))
+        efficiency_winner = max(self.players, key=lambda p: p.get('roi', 0))
+
         result_window = tk.Toplevel(self.root)
         result_window.title("🏁 Heist Conclusion")
         result_window.geometry("800x600")
@@ -499,23 +521,36 @@ class FinancialTheftSimulator:
         self.center_window(result_window, 800, 600)
         main_frame = ttk.Frame(result_window, padding=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
-        for player in sorted(self.players, key=lambda p: p.get('roi', 0), reverse=True):
+
+        for player in self.players:
             roi = player.get('roi', 0)
+            npv = player.get('npv', 0)
             if roi > 50:
                 conclusion = "🌟 THE LEGEND BEGINS: You're now a myth in the criminal underworld!"
             elif 20 <= roi <= 50:
                 conclusion = "👻 YOU'RE THE GHOST IN THE SYSTEM: The perfect invisible heist!"
             else:
                 conclusion = "💥 BURNED MARK: Better luck next time in the shadows..."
+
+            # Highlight winners
+            winner_tags = []
+            if player is strategic_winner:
+                winner_tags.append("🏆 Strategic Winner (Highest NPV)")
+            if player is efficiency_winner:
+                winner_tags.append("⚡ Efficiency Winner (Highest ROI)")
+            winner_text = " | ".join(winner_tags)
+            if winner_text:
+                conclusion = f"{conclusion}\n{winner_text}"
+
             player_frame = ttk.LabelFrame(main_frame, text=f"🔦 {player['name']}", padding=10)
             player_frame.pack(fill=tk.X, pady=5)
             ttk.Label(player_frame, text=conclusion, font=('Arial', 11, 'bold'), foreground='#2c3e50').grid(row=0, column=0, sticky="w")
-            ttk.Label(player_frame, text=f"Final Capital: ${player['capital']:,.2f}\nROI: {roi:.2f}%",
+            ttk.Label(player_frame, text=f"Final Capital: ${player['capital']:,.2f}\nNPV: ${npv:,.2f}\nROI: {roi:.2f}%",
                       font=('Arial', 10), foreground='#2c3e50').grid(row=1, column=0, sticky="w")
+
         ttk.Button(main_frame, text="🔚 Exit", command=self.root.destroy, style='Accent.TButton').pack(pady=10)
 
 if __name__ == '__main__':
     root = tk.Tk()
     app = FinancialTheftSimulator(root)
     root.mainloop()
-
